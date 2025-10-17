@@ -1,0 +1,7 @@
+.vscode
+db/app.db
+node_modules
+API.md
+tsconfig.json
+yarn.lock
+.env
