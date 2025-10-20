@@ -5,3 +5,4 @@ API.md
 tsconfig.json
 yarn.lock
 .env
+.editorconfig

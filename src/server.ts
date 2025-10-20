@@ -1,11 +1,17 @@
 import Fastify from "fastify";
-import Router from "./router";
+import StudentsRouter from "./router/students.routes";
+
+import HomeworkRouter from "./router/homework.routes";
 import { env } from "./env";
 
 const server = Fastify();
 
-server.register(Router, {
+server.register(StudentsRouter, {
   prefix: "students",
+});
+
+server.register(HomeworkRouter, {
+  prefix: "homeworks",
 });
 
 server
