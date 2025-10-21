@@ -4,6 +4,14 @@ import { z, ZodError } from "zod";
 import crypto from "crypto";
 import { database } from "../database/config";
 
+import fs from "fs";
+import csvParser from "csv-parser";
+
+interface IChunk {
+  name: string;
+  email: string;
+}
+
 const paramsSchema = z.object({
   id: z.uuid("id is incorrect or not found!").min(5),
 });
@@ -109,4 +117,43 @@ export default async function Router(server: FastifyInstance) {
 
     return res.status(204).send();
   });
+
+  server.post("/uploads", async (req, reply) => {
+    const data = await req.file();
+    const payloadSchema = z.array(z.object({
+      name: z.string("Missing payload name").min(5),
+      email: z
+        .email("Missing payload email")
+        .min(5)
+        .refine(
+          async (value) => !(value === (await findStudentByEmail(value))),
+          "Email is already exists in database!"
+        ),
+    }));
+
+    if (data === undefined) return reply.status(400).send({ errors: ["Error could not upload file - file not found!"] })
+
+    const chunks: IChunk[] = [];
+
+    await data.file.pipe(csvParser()).forEach((chunk: IChunk) => {
+      chunks.push(chunk);
+    })
+
+    try {
+      const parsedData = await payloadSchema.parseAsync(chunks);
+      parsedData.forEach(async ({ name, email }) => {
+        await database("students").insert({
+          id: crypto.randomUUID(),
+          name,
+          email
+        })
+      })
+      return reply.status(201).send({ uploaded: true })
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return reply.status(400).send({ errors: error.issues })
+      }
+    }
+
+  })
 }

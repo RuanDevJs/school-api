@@ -4,7 +4,11 @@ import StudentsRouter from "./router/students.routes";
 import HomeworkRouter from "./router/homework.routes";
 import { env } from "./env";
 
+import multipart from "@fastify/multipart"
+
 const server = Fastify();
+
+server.register(multipart);
 
 server.register(StudentsRouter, {
   prefix: "students",

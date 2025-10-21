@@ -3,17 +3,10 @@ import { z, ZodError } from "zod";
 
 import crypto from "crypto";
 import { database } from "../database/config";
+import { validateParams } from "../middlewares/validate-params";
 
-const paramsSchema = z.object({
-  id: z.uuid("id is incorrect or not found!").min(5),
-});
-
-async function findStudentByEmail(email: string) {
-  const userEmail = await database("homework")
-    .select("email")
-    .where("email", "=", email);
-
-  return userEmail && userEmail.length ? (userEmail[0].email as string) : null;
+interface IParams {
+  id: string;
 }
 
 export default async function HomeworkRouter(server: FastifyInstance) {
@@ -22,9 +15,9 @@ export default async function HomeworkRouter(server: FastifyInstance) {
     return homeworks;
   });
 
-  server.get("/:id", async (req, res) => {
+  server.get("/:id", { preHandler: [validateParams] }, async (req, res) => {
     try {
-      const params = paramsSchema.parse(req.params);
+      const params = req.params as IParams;
       const student = await database("homework")
         .select("*")
         .where("id", params.id);
@@ -64,14 +57,8 @@ export default async function HomeworkRouter(server: FastifyInstance) {
     return res.status(201).send();
   });
 
-  server.put("/:id", async (req, res) => {
-    const params = paramsSchema.safeParse(req.params);
-
-    if (!params.success) {
-      return res
-        .status(400)
-        .send({ errors: params.error.issues.map((errors) => errors.message) });
-    }
+  server.put("/:id", { preHandler: [validateParams] }, async (req, res) => {
+    const params = req.params as IParams;
 
     const payloadSchema = z.object({
       title: z.string("Missing payload title").min(5).optional(),
@@ -89,11 +76,40 @@ export default async function HomeworkRouter(server: FastifyInstance) {
     }
 
     await database("homework")
-      .where("id", params.data.id)
+      .where("id", params.id)
       .update({
         ...data,
       });
 
     return res.status(204).send();
   });
+
+  server.post("/:id", { preHandler: [validateParams] }, async (req, reply) => {
+    const params = req.params as IParams;
+    const payloadSchema = z.object({
+      student_id: z.uuid("Payload is invalid! student_id is not valid!").min(5),
+    });
+
+    const { success, data, error } = payloadSchema.safeParse(req.body);
+
+    if (!success) {
+      return reply
+        .status(400)
+        .send({ errors: error.issues.map((errors) => errors.message) });
+    }
+
+    await database("student_homework").insert({
+      id: crypto.randomUUID(),
+      student_id: data.student_id,
+      homework_id: params.id
+    })
+
+    return reply.status(201).send()
+  })
+
+  server.get("/students", async (req, reply) => {
+    const rows = await database("student_homework").select("*")
+
+    return reply.status(201).send(rows)
+  })
 }
